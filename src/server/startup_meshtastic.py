@@ -2,12 +2,11 @@ import os
 import asyncio
 
 from handlers.meshtastic_handler import create_mesh_handler
-from Meshtastic.tcp_connection import TcpConnection
-from core.mesh_gateway import register_mesh_runtime, subscribe_to_packets
-from Meshtastic.meshtastic_ingestion_handler import ingest as meshtastic_ingest
-from Meshtastic.packets.packet_builder import build_to_radio_frame
-from routing.node_mapping import wait_for_mapping
-
+from meshtastic.tcp_connection import TcpConnection
+# from core.mesh_gateway import register_mesh_runtime, subscribe_to_packets
+from meshtastic.meshtastic_ingestion_handler import ingest as meshtastic_ingest
+from meshtastic.packets.packet_builder import build_to_radio_frame
+from meshtastic.utils.node_mapping import wait_for_mapping
 
 async def start_meshtastic():
     # --- Config ---
@@ -29,7 +28,7 @@ async def start_meshtastic():
     TcpConnection.bind_mesh_requests(mesh)
 
     # Register runtime with gateway
-    register_mesh_runtime("mesh-1", "meshtastic", mesh)
+    # register_mesh_runtime("mesh-1", "meshtastic", mesh)
 
     # Subscribe to packets for ingestion
     subscribe_to_packets("mesh-1", lambda meta, buffer: meshtastic_ingest(meta, buffer))

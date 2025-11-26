@@ -3,8 +3,8 @@ import uuid
 import asyncio
 
 from handlers.meshcore_handler import MeshcoreHandler
-from MeshCore.meshcore_requests import bind_mesh_runtime as bind_meshcore_requests
-from core.mesh_gateway import register_mesh_runtime
+from meshcore.meshcore_requests import bind_mesh_runtime as bind_meshcore_requests
+# from core.mesh_gateway import register_mesh_runtime
 
 
 async def start_meshcore():
@@ -25,7 +25,7 @@ async def start_meshcore():
     bind_meshcore_requests(meshcore)
 
     # Register runtime with gateway
-    register_mesh_runtime("meshcore-1", "meshcore", meshcore)
+    # register_mesh_runtime("meshcore-1", "meshcore", meshcore)
 
     # --- Startup sequence ---
     try:

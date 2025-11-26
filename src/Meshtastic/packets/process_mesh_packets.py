@@ -1,7 +1,7 @@
-from src.Utils.portnum_utils import get_port_name
-from src.Utils.decompress import decompress
-from src.Utils.packet_utils import parse_plain_message, get_base_meta, get_channel
-from src.Utils.packet_decode import try_decode_buf
+from src.meshtastic.utils.portnum_utils import get_port_name
+from src.meshtastic.utils.decompress import decompress
+from src.meshtastic.utils.packet_utils import parse_plain_message, get_base_meta, get_channel
+from src.meshtastic.utils.packet_decode import try_decode_buf
 from routing.dispatch_packet import dispatch_packet
 
 

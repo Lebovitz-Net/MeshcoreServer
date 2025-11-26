@@ -1,7 +1,7 @@
 # src/meshcore/decode_meshcore_packet.py
 
-from src.meshcore.packet import Packet
-from external.meshcore.packet import Decoders  # your existing decoder registry
+from external.meshcore_py.src.packets import Packet
+from external.meshcore_py.src.packets import Decoders  # your existing decoder registry
 from src.meshtastic.utils.proto_utils import un_frame
 
 

@@ -1,5 +1,5 @@
 from db.insert_handlers import insertHandlers
-from overlays.overlay_emitter import emitOverlay
+from events.overlay_emitter import emitOverlay
 
 
 def handle_queue_status(sub_packet: dict):

@@ -1,6 +1,6 @@
 import json
 from db.insert_handlers import insertHandlers
-from overlays.overlay_emitter import emitOverlay
+from events.overlay_emitter import emitOverlay
 from events.event_emitter import emitEvent
 
 

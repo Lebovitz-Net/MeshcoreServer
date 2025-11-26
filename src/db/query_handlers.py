@@ -1,4 +1,3 @@
-python
 from src.db.queries.node_queries import node_queries
 from src.db.queries.config_queries import config_queries
 from src.db.queries.device_queries import device_queries

@@ -4,15 +4,15 @@ import os
 import sqlite3
 from pathlib import Path
 
-from src.meshtastic.utils.db_nodes import db_nodes
-from src.meshtastic.utils.db_metrics import db_metrics
-from src.meshtastic.utils.db_messages import db_messages
-from src.meshtastic.utils.db_maps import db_maps
-from src.meshtastic.utils.db_diagnostics import db_diagnostics
-from src.meshtastic.utils.db_connections import db_connections
-from src.meshtastic.utils.db_configs import db_configs
-from src.meshtastic.utils.db_contacts import db_contacts
-from src.meshtastic.utils.db_channels import db_channels
+from src.db.db_nodes import db_nodes
+from src.db.db_metrics import db_metrics
+from src.db.db_messages import db_messages
+from src.db.db_maps import db_maps
+from src.db.db_diagnostics import db_diagnostics
+from src.db.db_connections import db_connections
+from src.db.db_configs import db_configs
+from src.db.db_contacts import db_contacts
+from src.db.db_channels import db_channels
 
 # --- Combined schema tables ---
 tables = (

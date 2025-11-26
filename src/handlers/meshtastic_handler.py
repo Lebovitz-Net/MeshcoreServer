@@ -1,7 +1,7 @@
 import asyncio
-from ..event_emitter import EventEmitter
-from Meshtastic.tcp_connection import TcpConnection
-from Meshtastic.serial_connection import SerialConnection
+from events.event_emitter import EventEmitter
+from meshtastic.tcp_connection import TcpConnection
+from meshtastic.serial_connection import SerialConnection
 
 
 class MeshtasticHandler(EventEmitter):

@@ -1,7 +1,7 @@
 import json
 from db.insert_handlers import insertHandlers
-from overlays.overlay_emitter import emitOverlay
-from MeshCore.utils.string_utils import decode_node_info
+from events.overlay_emitter import emitOverlay
+from meshcore.utils.string_utils import decode_node_info
 
 insert_log_record = insertHandlers.insertLogRecord
 insert_trace_data = insertHandlers.insertTraceData

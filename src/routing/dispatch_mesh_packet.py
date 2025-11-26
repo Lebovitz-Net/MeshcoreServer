@@ -1,4 +1,4 @@
-from Meshtastic.packets.process_mesh_packet import process_mesh_packet
+from meshtastic.packets.process_mesh_packets import process_mesh_packet
 
 
 def handle_data(packet: dict):
