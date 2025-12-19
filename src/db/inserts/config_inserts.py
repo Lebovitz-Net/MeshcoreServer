@@ -1,154 +1,125 @@
-# src/meshtastic/utils/config_inserts.py
+# src/db/inserts/config_inserts.py
 
-from src.db.database import db
+class ConfigInserts:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    """
+    Provides config-related insert handlers.
+    Expects `self.db` to be a valid database connection.
+    """
 
+    def insert_config(self, sub_packet: dict) -> None:
+        sql = """
+            INSERT INTO config (
+                num, type, payload, timestamp, device_id, conn_id
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                sql,
+                (
+                    sub_packet.get("fromNodeNum"),
+                    sub_packet.get("key"),
+                    sub_packet.get("data"),
+                    sub_packet.get("timestamp"),
+                    sub_packet.get("device_id"),
+                    sub_packet.get("connId"),
+                ),
+            )
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting config: {err}")
 
-def _insert_config(sub_packet: dict) -> None:
-    """
-    Insert a config record into the database.
-    """
-    sql = """
-        INSERT INTO config (
-            num, type, payload, timestamp, device_id, conn_id
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    """
-    try:
-        cursor = db.cursor()
-        cursor.execute(
-            sql,
-            (
-                sub_packet.get("fromNodeNum"),
-                sub_packet.get("key"),
-                sub_packet.get("data"),
-                sub_packet.get("timestamp"),
-                sub_packet.get("device_id"),
-                sub_packet.get("connId"),
-            ),
-        )
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting config: {err}")
+    def insert_module_config(self, sub_packet: dict) -> None:
+        sql = """
+            INSERT INTO module_config (
+                num, type, payload, timestamp, device_id, conn_id
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                sql,
+                (
+                    sub_packet.get("fromNodeNum"),
+                    sub_packet.get("key"),
+                    sub_packet.get("data"),
+                    sub_packet.get("timestamp"),
+                    sub_packet.get("device_id"),
+                    sub_packet.get("connId"),
+                ),
+            )
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting module_config: {err}")
 
+    def insert_connection(self, connection: dict) -> None:
+        sql = """
+            INSERT INTO connections (connection_id, num, transport, status)
+            VALUES (?, ?, ?, ?)
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                sql,
+                (
+                    connection.get("connection_id"),
+                    connection.get("num"),
+                    connection.get("transport"),
+                    connection.get("status"),
+                ),
+            )
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting connection: {err}")
 
-def _insert_module_config(sub_packet: dict) -> None:
-    """
-    Insert a module_config record into the database.
-    """
-    sql = """
-        INSERT INTO module_config (
-            num, type, payload, timestamp, device_id, conn_id
-        ) VALUES (?, ?, ?, ?, ?, ?)
-    """
-    try:
-        cursor = db.cursor()
-        cursor.execute(
-            sql,
-            (
-                sub_packet.get("fromNodeNum"),
-                sub_packet.get("key"),
-                sub_packet.get("data"),
-                sub_packet.get("timestamp"),
-                sub_packet.get("device_id"),
-                sub_packet.get("connId"),
-            ),
-        )
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting module_config: {err}")
+    def insert_file_info(self, data: dict) -> None:
+        filename = data.get("filename")
+        size = data.get("size")
+        from_node_num = data.get("fromNodeNum")
 
+        if not filename or not size or not from_node_num:
+            print("[insertFileInfo] Skipped insert: missing required fields", filename, size, from_node_num)
+            return
 
-def _insert_connection(connection: dict) -> None:
-    """
-    Insert a connection record into the database.
-    """
-    sql = """
-        INSERT INTO connections (connection_id, num, transport, status)
-        VALUES (?, ?, ?, ?)
-    """
-    try:
-        cursor = db.cursor()
-        cursor.execute(
-            sql,
-            (
-                connection.get("connection_id"),
-                connection.get("num"),
-                connection.get("transport"),
-                connection.get("status"),
-            ),
-        )
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting connection: {err}")
+        sql = """
+            INSERT INTO file_info (
+                filename, size, mime_type, description,
+                num, timestamp, conn_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                sql,
+                (
+                    filename,
+                    size,
+                    data.get("mime_type"),
+                    data.get("description"),
+                    from_node_num,
+                    data.get("timestamp"),
+                    data.get("connId"),
+                ),
+            )
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting file_info: {err}")
 
-
-def _insert_file_info(data: dict) -> None:
-    """
-    Insert a file_info record into the database.
-    """
-    filename = data.get("filename")
-    size = data.get("size")
-    from_node_num = data.get("fromNodeNum")
-
-    if not filename or not size or not from_node_num:
-        print(
-            "[insertFileInfo] Skipped insert: missing required fields",
-            filename,
-            size,
-            from_node_num,
-        )
-        return
-
-    sql = """
-        INSERT INTO file_info (
-            filename, size, mime_type, description,
-            num, timestamp, conn_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    """
-    try:
-        cursor = db.cursor()
-        cursor.execute(
-            sql,
-            (
-                filename,
-                size,
-                data.get("mime_type"),
-                data.get("description"),
-                from_node_num,
-                data.get("timestamp"),
-                data.get("connId"),
-            ),
-        )
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting file_info: {err}")
-
-
-def _insert_metadata(sub_packet: dict) -> None:
-    """
-    Insert a metadata record into the database.
-    """
-    sql = """
-        INSERT INTO metadata (
-            num, firmwareVersion, deviceStateVersion, canShutdown,
-            hasWifi, hasBluetooth, hwModel, hasPKC, excludedModules
-        ) VALUES (
-            :num, :firmwareVersion, :deviceStateVersion, :canShutdown,
-            :hasWifi, :hasBluetooth, :hwModel, :hasPKC, :excludedModules
-        )
-    """
-    try:
-        cursor = db.cursor()
-        cursor.execute(sql, sub_packet)
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting metadata: {err}")
-
-
-# Exported object of insert functions
-config_inserts = {
-    "insertConfig": _insert_config,
-    "insertModuleConfig": _insert_module_config,
-    "insertConnection": _insert_connection,
-    "insertFileInfo": _insert_file_info,
-    "insertMetadata": _insert_metadata,
-}
+    def insert_metadata(self, sub_packet: dict) -> None:
+        sql = """
+            INSERT INTO metadata (
+                num, firmwareVersion, deviceStateVersion, canShutdown,
+                hasWifi, hasBluetooth, hwModel, hasPKC, excludedModules
+            ) VALUES (
+                :num, :firmwareVersion, :deviceStateVersion, :canShutdown,
+                :hasWifi, :hasBluetooth, :hwModel, :hasPKC, :excludedModules
+            )
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(sql, sub_packet)
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting metadata: {err}")

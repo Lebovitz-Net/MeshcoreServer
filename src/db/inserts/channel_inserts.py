@@ -1,57 +1,35 @@
-# src/meshtastic/utils/channel_inserts.py
+# src/db/inserts/channel_inserts.py
 
 import time
-from src.db.database import db
-from src.server.sse_emitters import emit_channel_update
 
-
-def _insert_channel(packet: dict) -> None:
+class ChannelInserts:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
     """
-    Insert or replace a channel record in the database,
-    then emit a channel update event.
-    """
-    sql = """
-        INSERT OR REPLACE INTO channels (
-            channelIdx,
-            channelNum,
-            nodeNum,
-            protocol,
-            name,
-            role,
-            psk,
-            options,
-            timestamp,
-            connId
-        ) VALUES (
-            :channelIdx,
-            :channelNum,
-            :nodeNum,
-            :protocol,
-            :name,
-            :role,
-            :psk,
-            :options,
-            :timestamp,
-            :connId
-        )
+    Provides the insert_channel handler.
+    Expects `self.db` to be a valid database connection.
     """
 
-    try:
-        cursor = db.cursor()
-        cursor.execute(sql, packet)
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting channel: {err}")
-        return
+    def insert_channel(self, packet: dict) -> None:
+        sql = """
+            INSERT OR REPLACE INTO channels (
+                channelIdx, channelNum, nodeNum, protocol, name,
+                role, psk, options, timestamp, connId
+            ) VALUES (
+                :channelIdx, :channelNum, :nodeNum, :protocol, :name,
+                :role, :psk, :options, :timestamp, :connId
+            )
+        """
 
-    # Emit channel update with updatedAt timestamp
-    emit_channel_update({
-        **packet,
-        "updatedAt": int(time.time() * 1000),  # ms timestamp
-    })
-
-
-# Exported object of insert functions
-channel_inserts = {
-    "insertChannel": _insert_channel,
-}
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(sql, packet)
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting channel: {err}")
+            return
+        print (".../CHANNEL INSERT SSE EMITTER", type(self.sse_emitter))
+        self.sse_emitter.emit("channel_updated", {
+            **packet,
+            "updatedAt": int(time.time() * 1000),
+        })

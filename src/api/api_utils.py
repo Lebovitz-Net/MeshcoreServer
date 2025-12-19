@@ -1,28 +1,64 @@
-# api_utils.py
-import hashlib, re, time
-from functools import wraps
-from flask import jsonify
+# src/api/api_utils.py
+import json
+import hashlib
 import re
+from aiohttp import web
+from functools import wraps
+
 
 def safe(fn):
+    """
+    Decorator that wraps all API handlers and ensures:
+    - Exceptions are caught
+    - Errors are logged
+    - A JSON error response is returned
+    """
     @wraps(fn)
-    def wrapper(*args, **kwargs):
+    async def wrapper(request, *args, **kwargs):
         try:
-            return fn(*args, **kwargs)
+            return await fn(request, *args, **kwargs)
+        except web.HTTPException:
+            raise
         except Exception as err:
             print(f"[safe] Error: {err}")
-            return jsonify({"error": "Internal server error"}), 500
+            return web.json_response({"error": "Internal server error"}, status=500)
     return wrapper
 
-def generate_message_id(packet: dict) -> str:
-    base = "|".join([
-        packet.get("protocol", "meshcore"),
-        str(packet.get("sender")),
-        packet.get("channel", "default"),
-        str(packet.get("timestamp", int(time.time()*1000))),
-        packet.get("text") or packet.get("message", "")
-    ])
-    return hashlib.sha256(base.encode()).hexdigest()[:16]
+
+def safe_json(data):
+    """
+    Convert sqlite Row objects or lists of Rows into JSON-serializable structures.
+    Handles:
+    - sqlite3.Row
+    - lists/tuples of rows
+    - nested dicts
+    - primitives
+    """
+    if data is None:
+        return None
+
+    # sqlite3.Row or similar
+    if hasattr(data, "keys"):
+        return {k: safe_json(data[k]) for k in data.keys()}
+
+    # list or tuple
+    if isinstance(data, (list, tuple)):
+        return [safe_json(item) for item in data]
+
+    # dict
+    if isinstance(data, dict):
+        return {k: safe_json(v) for k, v in data.items()}
+
+    # primitives (int, str, float, bool, None)
+    return data
+
+
+def generate_message_id(message_obj):
+    """
+    Deterministic message ID generator.
+    """
+    raw = json.dumps(message_obj, sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:16]
 
 def extract_sender_and_mentions(msg: str) -> tuple[str, list[str]]:
     """
@@ -37,4 +73,3 @@ def extract_sender_and_mentions(msg: str) -> tuple[str, list[str]]:
     sender, message = msg.split(":", 1)
     mentions = list(set(m.lower() for m in re.findall(r"@(\w+)", message)))
     return sender.strip().lower(), mentions
-

@@ -1,7 +1,8 @@
 import json
 import logging
 import paho.mqtt.client as mqtt
-import time
+import asyncio
+import socket
 
 logging.basicConfig(level=logging.INFO)
 
@@ -12,8 +13,10 @@ class MqttHandler:
         self.client = None
         self.node_id = None
 
-    def connect(self, node_id: str, retries: int = 3, delay: int = 5):
-        """Connect to MQTT broker with retry logic."""
+    async def connect(self, node_id: str, port: int = 1883, keepalive: int = 60,
+                      retries: int = 3, delay: int = 5):
+        """Async-friendly connect to MQTT broker with retry logic and DNS check."""
+        logging.info(f"[MQTT] Server Startup - Connecting to {self.broker}")
         self.node_id = node_id
         self.client = mqtt.Client(client_id=node_id)
 
@@ -30,16 +33,22 @@ class MqttHandler:
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
 
+        # DNS pre-check
+        try:
+            socket.getaddrinfo(self.broker, port)
+        except socket.gaierror as e:
+            raise ConnectionError(f"DNS resolution failed for {self.broker}:{port} ({e})")
+
         # Retry loop
         for attempt in range(1, retries + 1):
             try:
-                self.client.connect(self.broker)
+                self.client.connect(self.broker, port=port, keepalive=keepalive)
                 self.client.loop_start()
                 return
             except Exception as e:
                 logging.error(f"[MQTT] Connect attempt {attempt} failed: {e}")
-                time.sleep(delay)
-        raise ConnectionError(f"Failed to connect to MQTT broker {self.broker}")
+                await asyncio.sleep(delay)  # async-friendly sleep
+        raise ConnectionError(f"Failed to connect to MQTT broker {self.broker}:{port}")
 
     def _on_connect(self, client, userdata, flags, rc):
         if rc == 0:
@@ -48,15 +57,15 @@ class MqttHandler:
             self.subscribe("meshcore/test", qos=1)
             self.subscribe("meshcore/ingest", qos=1)
             self.subscribe(f"meshcore/{self.node_id}/downlink", qos=1)
-            self.subscribe("meshcore/*/uplink", qos=1)
+            self.subscribe("meshcore/+/uplink", qos=1)  # ✅ fixed wildcard
 
             # Test publish
             self.publish("meshcore/test", "Hello MeshCore!", qos=1)
         else:
-            logging.error(f"[MQTT] Connection failed with code {rc}")
+            logging.error(f"[MQTT] Connection failed: {mqtt.error_string(rc)}")
 
     def _on_disconnect(self, client, userdata, rc):
-        logging.warning("[MQTT] Connection closed")
+        logging.warning(f"[MQTT] Connection closed (code {rc})")
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
@@ -70,7 +79,7 @@ class MqttHandler:
 
         if topic.endswith("/uplink") and node_id:
             logging.info(f"[MQTT] Uplink from {node_id}: {payload}")
-            # TODO: process uplink payload (store, forward, etc.)
+            # TODO: process uplink payload
         elif topic.endswith("/downlink") and node_id:
             logging.info(f"[MQTT] Downlink for {node_id}: {payload}")
             # TODO: forward payload into MeshCore
@@ -89,7 +98,7 @@ class MqttHandler:
             if result == mqtt.MQTT_ERR_SUCCESS:
                 logging.info(f"[MQTT] Subscribed to {topic} id {mid}")
             else:
-                logging.error(f"[MQTT] Subscribe error: {result}")
+                logging.error(f"[MQTT] Subscribe error: {mqtt.error_string(result)}")
 
     def publish(self, topic: str, payload, qos: int = 0, retain: bool = False):
         if self.client:
@@ -97,7 +106,7 @@ class MqttHandler:
             if result == mqtt.MQTT_ERR_SUCCESS:
                 logging.info(f"[MQTT] Published to {topic}: {payload} id {mid}")
             else:
-                logging.error(f"[MQTT] Publish error: {result}")
+                logging.error(f"[MQTT] Publish error: {mqtt.error_string(result)}")
 
     def set_on_message(self, callback):
         if self.client:
@@ -111,8 +120,8 @@ class MqttHandler:
         if self.client:
             self.client.on_disconnect = callback
 
-    def shutdown(self):
-        """Gracefully stop MQTT loop and disconnect client."""
+    async def shutdown(self):
+        """Async, graceful shutdown of MQTT client."""
         logging.info("[MQTT] Shutting down...")
         try:
             if self.client:

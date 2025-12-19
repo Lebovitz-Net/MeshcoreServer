@@ -2,7 +2,7 @@
 
 import time
 import random
-from src.meshtastic.protobufs.proto_utils import (
+from .proto_utils import (
     frame,
     get_protobufs,
     serialize,

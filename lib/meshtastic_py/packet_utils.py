@@ -2,7 +2,7 @@
 import binascii
 import time
 from typing import Any, Dict, List, Optional, Union
-from src.meshtastic.protobufs.proto_utils import get_protobufs
+from protobufs.proto_utils import get_protobufs
 
 DEFAULT_SKIP_KEYS = ["payload", "data", "message"]
 

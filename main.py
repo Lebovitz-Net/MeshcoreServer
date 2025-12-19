@@ -13,7 +13,7 @@ sys.path.insert(0, src_path)
 async def main():
     app = create_app()
     port = 8000
-    runner = web.AppRunner(app)
+    runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     site = web.TCPSite(runner, host="0.0.0.0", port=port)
     await site.start()

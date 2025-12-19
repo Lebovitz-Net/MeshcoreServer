@@ -1,7 +1,7 @@
 # src/meshtastic/protobuf/proto_decode.py
 
 from typing import Optional, Dict, Any
-from src.meshtastic.protobufs.proto_utils import (
+from .proto_utils import (
     unframe,
     extract_frames,
     get_protobufs,

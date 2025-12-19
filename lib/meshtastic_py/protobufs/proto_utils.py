@@ -5,17 +5,13 @@ import sys
 import os
 
 from google.protobuf.json_format import MessageToDict
-# project_root = "C:/Users/glebo/Projects/MeshcoreServer"
-# sys.path.insert(0, project_root)
-# src_path = os.path.join(project_root, "src/meshtastic/protobufs")
-# sys.path.insert(0, src_path)
 
 current_file_path = os.path.abspath(__file__)
 current_dir = os.path.dirname(current_file_path)
 sys.path.insert(0, current_dir)
 
 # Import all generated protobuf modules
-from meshtastic import (
+from .meshtastic import (
     mesh_pb2,
     channel_pb2,
     config_pb2,

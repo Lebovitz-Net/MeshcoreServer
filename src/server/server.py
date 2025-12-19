@@ -1,34 +1,40 @@
 from aiohttp import web
 import aiohttp_cors
+from flask import app
+import logging
 
+from handlers.meshcore_handler import MeshcoreHandler
+from handlers.meshtastic_handler import MeshtasticHandler
 from src.server.startup_meshcore import start_meshcore, shutdown_meshcore
 from src.server.startup_meshtastic import start_meshtastic, shutdown_meshtastic
 from src.server.startup_mqtt import start_mqtt_server, shutdown_mqtt_server
-from src.server.sse import sse_events, shutdown as sse_shutdown
-from src.api.routes import register_routes
-from src.api.services_manager import shutdown as services_shutdown
-
-async def root(request):
-    return web.Response(text="MeshManager v2 is running")
-
-async def get_sse_events(request):
-    events = await sse_events()
-    return web.json_response(events)
-
+from src.api.routes import RoutesRegistrar
+from routing.dispatch_packet import DispatchPacket
+from .sse_emitter import SSEEmitter
+from src.handlers.requests import Requests
 
 async def startup(app: web.Application):
-    # loop = app.loop
-    # set_event_loop(loop)
-    # set_socket_loop(loop)
 
-    print("step 1 start_meshcore")
-    app["meshcore"] = await start_meshcore()
+    # Create SSEEmitter and register route
+    request = Requests (timeout_ms=10000)
+    sse_emitter = SSEEmitter(app, path="/events")
+    dispatcher =  DispatchPacket(sse_emitter, request)
 
-    print("step 2 start_meshtastic")
-    # app["meshtastic"] = await start_meshtastic()
+    meshcore_handler = MeshcoreHandler(dispatcher)
+    meshtastic_handler = MeshtasticHandler(dispatcher)
+    # set up the requester and initialize the command queue
+    request.start_requests(meshcore_handler, meshtastic_handler)
 
-    print("step 3 start_mqtt_server")
+    # routes
+    routes = RoutesRegistrar(dispatcher, request)
+    routes.register(app)
+
+
+    # app["meshtastic"] = await start_meshtastic(meshtastic_handler, request)
+    app["meshcore"] = await start_meshcore(meshcore_handler, request)
     app["mqtt_client"] = await start_mqtt_server()
+    app["routes"] = routes
+    app["sse_emitter"] = sse_emitter
 
     print("✅ completed startups")
 
@@ -48,19 +54,25 @@ async def shutdown(app: web.Application):
         shutdown_meshtastic(app["meshtastic"])
         print("Meshtastic shut down.")
 
-    sse_shutdown()
-    services_shutdown("shutdown")
+    if "requests" in app:
+        requests = app["requests"]
+        if request:
+            try:
+                request.shutdown()
+            except Exception as e:
+                print(f"[MeshcoreConnection] Error shutting down requests: {e}")
+            finally:
+                request = None
+        print("Meshcore requests shut down.")
+
+    app["sse_emitter"].shutdown()
+    app["routes"].api.shutdown("shutdown")
     print("SSE and services shut down.")
     print("✅ Server shutdown complete.")
 
 
 def create_app() -> web.Application:
     app = web.Application()
-
-    # routes
-    app.router.add_get("/", root)
-    app.router.add_get("/sse/events", get_sse_events)
-    register_routes(app)
 
     # hooks
     app.on_startup.append(startup)

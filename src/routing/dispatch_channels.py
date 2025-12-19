@@ -2,14 +2,10 @@
 
 import json
 from src.utils import get_text_from_key, hash_public_key, get_public_key_value
-from src.db.insert_handlers import InsertHandlers
-
 
 class DispatchChannels:
-    def handle_ChannelInfo(self, packet: dict):
-        outer_data = packet["data"]
-        data = outer_data["data"]
-        meta = outer_data["meta"]
+    def channel_info(self, packet: dict):
+        data, meta = packet["data"], packet["meta"]
         channel_idx, name, secret = data["channelIdx"], data["name"], data["secret"]
         print(".../ChannelInfo", channel_idx, name, secret)
 
@@ -26,9 +22,9 @@ class DispatchChannels:
         }
 
         if name and name.strip() and get_public_key_value(secret):
-            InsertHandlers.insertChannel(shaped)
+            self.insert_handlers.insert_channel(shaped)
 
-    def handle_channel(self, sub_packet: dict):
+    def channel(self, sub_packet: dict):
         data, meta = sub_packet["data"], sub_packet["meta"]
         channel = data.get("channel", {})
         settings = channel.get("settings", {})
@@ -41,7 +37,7 @@ class DispatchChannels:
         module_settings = settings.get("moduleSettings")
 
         if channel.get("role"):
-            InsertHandlers.insertChannel({
+            self.insert_handlers.insert_channel({
                 "channelNum": channel_num,
                 "channelIdx": channel.get("index", 0),
                 "nodeNum": meta["fromNodeNum"],

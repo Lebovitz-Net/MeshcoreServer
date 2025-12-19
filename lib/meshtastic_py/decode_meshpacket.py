@@ -1,9 +1,9 @@
-from src.meshtastic.utils.portnum_utils import get_port_name
-from src.meshtastic.utils.decompress import decompress
-from src.meshtastic.utils.packet_utils import parse_plain_message, get_base_meta, get_channel
-from src.meshtastic.protobufs.proto_decode import try_decode_buf
+from portnum_utils import get_port_name
+from decompress import decompress
+from packet_utils import parse_plain_message, get_base_meta, get_channel
+from protobufs.proto_decode import try_decode_buf
 
-def process_mesh_packet(packet: dict):
+def decode_meshpacket(packet: dict):
     data = packet.get("data", {})
     decoded = data.get("decoded", {})
     portnum = decoded.get("portnum")

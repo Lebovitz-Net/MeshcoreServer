@@ -7,7 +7,7 @@ from .schedule_reconnect import schedule_reconnect
 
 class SerialConnection(Connection):
     def __init__(self, device_path: str, baud_rate: int, conn_id: str = None):
-        super().__init__("serial", conn_id or str(uuid.uuid4()))
+        super().__init__()
         self.device_path = device_path
         self.baud_rate = baud_rate
         self.serial_connections = {}

@@ -1,53 +1,48 @@
-# src/meshtastic/utils/message_inserts.py
+# src/db/inserts/message_inserts.py
 
 import time
-from src.db.database import db
-from src.server.sse_emitters import emit_message_update
 from src.utils import normalize_in
 
-def _insert_message(msg: dict) -> None:
+class MessageInserts:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
     """
-    Insert a message record into the database and emit a message update.
-    """
-    recv_timestamp = normalize_in(msg.get("recvTimestamp"))
-    sent_timestamp = normalize_in(msg.get("sentTimestamp"))
-
-    sql = """
-        INSERT INTO messages (
-          contactId, messageId, channelId, fromNodeNum, toNodeNum,
-          message, recvTimestamp,
-          sentTimestamp, protocol, sender, mentions, options
-        )
-        VALUES (
-          :contactId, :messageId, :channelId, :fromNodeNum, :toNodeNum,
-          :message, :recvTimestamp,
-          :sentTimestamp, :protocol, :sender, :mentions, :options
-        )
+    Provides the insert_message handler.
+    Expects `self.db` to be a valid database connection.
     """
 
-    try:
-        cursor = db.cursor()
-        cursor.execute(
-            sql,
-            {
-                **msg,
-                "recvTimestamp": recv_timestamp,
-                "sentTimestamp": sent_timestamp,
-            },
-        )
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting message: {err}")
-        return
+    def insert_message(self, msg: dict) -> None:
+        recv_timestamp = normalize_in(msg.get("recvTimestamp"))
+        sent_timestamp = normalize_in(msg.get("sentTimestamp"))
 
-    # Emit message update with timestamp fallback
-    emit_message_update({
-        **msg,
-        "timestamp": msg.get("timestamp", int(time.time() * 1000)),
-    })
+        sql = """
+            INSERT INTO messages (
+              contactId, messageId, channelId, fromNodeNum, toNodeNum,
+              message, recvTimestamp,
+              sentTimestamp, protocol, sender, mentions, options
+            )
+            VALUES (
+              :contactId, :messageId, :channelId, :fromNodeNum, :toNodeNum,
+              :message, :recvTimestamp,
+              :sentTimestamp, :protocol, :sender, :mentions, :options
+            )
+        """
 
-
-# Exported object of insert functions
-message_inserts = {
-    "insertMessage": _insert_message,
-}
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(
+                sql,
+                {
+                    **msg,
+                    "recvTimestamp": recv_timestamp,
+                    "sentTimestamp": sent_timestamp,
+                },
+            )
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting message: {err}")
+            return
+        self.sse_emitter.emit("message_arrived", {
+            **msg,
+            "timestamp": msg.get("timestamp", int(time.time() * 1000)),
+        })

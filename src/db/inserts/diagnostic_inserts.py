@@ -1,141 +1,129 @@
-# src/meshtastic/utils/diagnostic_inserts.py
+# src/db/inserts/diagnostic_inserts.py
 
 import json
 import time
-from src.db.database import db, db_boolean
 
-def _insert_log_record(data: dict) -> None:
-    message = data.get("message")
-    from_node_num = data.get("fromNodeNum")
-    timestamp = data.get("timestamp")
-    conn_id = data.get("connId")
-
-    if not message or not isinstance(from_node_num, (int, float)):
-        print("[insertLogRecord] Skipped insert: missing required fields", data)
-        return
-
-    sql = """
-        INSERT OR IGNORE INTO log_records (
-          num, packetType, message, timestamp, connId, decodeStatus
-        ) VALUES (?, ?, ?, ?, ?, ?)
+class DiagnosticInserts:
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
     """
-    try:
-        cursor = db.cursor()
-        cursor.execute(sql, (from_node_num, "logRecord", message, timestamp, conn_id, db_boolean(True)))
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting log_record: {err}")
+    Provides diagnostic/log insert handlers.
+    """
 
+    def insert_log_record(self, data: dict) -> None:
+        message = data.get("message")
+        from_node_num = data.get("fromNodeNum")
+        timestamp = data.get("timestamp")
+        conn_id = data.get("connId")
 
-def _insert_packet_log(packet: dict) -> bool:
-    num = packet.get("num")
-    packet_type = packet.get("packet_type")
-    timestamp = packet.get("timestamp")
-    raw_payload = packet.get("raw_payload")
-
-    if not num:
-        print("[insertPacketLog] Skipping log: no num provided")
-        return False
-
-    try:
-        cursor = db.cursor()
-        cursor.execute("SELECT 1 FROM nodes WHERE num = ?", (num,))
-        exists = cursor.fetchone()
-        if not exists:
-            print(f"[insertPacketLog] Skipping log: no parent node for num={num}")
-            return False
+        if not message or not isinstance(from_node_num, (int, float)):
+            print("[insertLogRecord] Skipped insert: missing required fields", data)
+            return
 
         sql = """
-            INSERT INTO packet_logs (
-              num, packet_type, timestamp, raw_payload
-            ) VALUES (?, ?, ?, ?)
+            INSERT OR IGNORE INTO log_records (
+              num, packetType, message, timestamp, connId, decodeStatus
+            ) VALUES (?, ?, ?, ?, ?, ?)
         """
-        cursor.execute(sql, (num, packet_type, timestamp, raw_payload))
-        db.commit()
-        return True
-    except Exception as err:
-        print(f"[DB] Error inserting packet_log: {err}")
-        return False
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(sql, (from_node_num, "logRecord", message, timestamp, conn_id, 1))
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting log_record: {err}")
 
+    def insert_packet_log(self, packet: dict) -> bool:
+        num = packet.get("num")
+        packet_type = packet.get("packet_type")
+        timestamp = packet.get("timestamp")
+        raw_payload = packet.get("raw_payload")
 
-def _inject_packet_log(packet: dict) -> dict:
-    num = packet.get("num")
-    packet_type = packet.get("packet_type")
-    raw_payload = packet.get("raw_payload")
-    timestamp = packet.get("timestamp", int(time.time()))
+        if not num:
+            print("[insertPacketLog] Skipping log: no num provided")
+            return False
 
-    if not num or not packet_type or raw_payload is None:
-        raise ValueError("Missing required fields: num, packet_type, raw_payload")
+        try:
+            cursor = self.db.cursor()
+            cursor.execute("SELECT 1 FROM nodes WHERE num = ?", (num,))
+            exists = cursor.fetchone()
+            if not exists:
+                print(f"[insertPacketLog] Skipping log: no parent node for num={num}")
+                return False
 
-    payload = raw_payload if isinstance(raw_payload, str) else json.dumps(raw_payload)
+            sql = """
+                INSERT INTO packet_logs (
+                  num, packet_type, timestamp, raw_payload
+                ) VALUES (?, ?, ?, ?)
+            """
+            cursor.execute(sql, (num, packet_type, timestamp, raw_payload))
+            self.db.commit()
+            return True
+        except Exception as err:
+            print(f"[DB] Error inserting packet_log: {err}")
+            return False
 
-    sql = """
-        INSERT INTO packet_logs (num, packet_type, raw_payload, timestamp)
-        VALUES (?, ?, ?, ?)
-    """
-    try:
-        cursor = db.cursor()
-        cursor.execute(sql, (num, packet_type, payload, timestamp))
-        db.commit()
+    def inject_packet_log(self, packet: dict) -> dict:
+        num = packet.get("num")
+        packet_type = packet.get("packet_type")
+        raw_payload = packet.get("raw_payload")
+        timestamp = packet.get("timestamp", int(time.time()))
 
-        cursor.execute("SELECT last_insert_rowid() AS id")
-        row = cursor.fetchone()
-        return {"inserted": True, "log_id": row["id"] if row else None}
-    except Exception as err:
-        print(f"[DB] Error injecting packet_log: {err}")
-        return {"inserted": False, "log_id": None}
+        if not num or not packet_type or raw_payload is None:
+            raise ValueError("Missing required fields: num, packet_type, raw_payload")
 
+        payload = raw_payload if isinstance(raw_payload, str) else json.dumps(raw_payload)
 
-def _insert_trace_data(trace: dict) -> None:
-    data = trace.get("data", {})
-    meta = trace.get("meta", {})
+        sql = """
+            INSERT INTO packet_logs (num, packet_type, raw_payload, timestamp)
+            VALUES (?, ?, ?, ?)
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(sql, (num, packet_type, payload, timestamp))
+            self.db.commit()
 
-    inner = data.get("data", {})
-    tag = inner.get("tag")
-    path_len = inner.get("pathLen")
-    last_snr = inner.get("lastSnr")
-    path_hashes = inner.get("pathHashes", [])
-    path_snrs = inner.get("pathSnrs", [])
+            cursor.execute("SELECT last_insert_rowid() AS id")
+            row = cursor.fetchone()
+            return {"inserted": True, "log_id": row["id"] if row else None}
+        except Exception as err:
+            print(f"[DB] Error injecting packet_log: {err}")
+            return {"inserted": False, "log_id": None}
 
-    conn_id = meta.get("connId")
-    timestamp = meta.get("timestamp")
+    def insert_trace_data(self, trace: dict) -> None:
+        data = trace.get("data", {})
+        meta = trace.get("meta", {})
 
-    payload_hashes = json.dumps(path_hashes)
-    payload_snrs = json.dumps(path_snrs)
+        inner = data.get("data", {})
+        tag = inner.get("tag")
+        path_len = inner.get("pathLen")
+        last_snr = inner.get("lastSnr")
+        path_hashes = inner.get("pathHashes", [])
+        path_snrs = inner.get("pathSnrs", [])
 
-    sql = """
-        INSERT INTO trace_logs (
-          connId, nodeNum, tag, pathLen, lastSnr,
-          pathHashes, pathSnrs, timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """
-    try:
-        cursor = db.cursor()
-        cursor.execute(sql, (conn_id, None, tag, path_len, last_snr, payload_hashes, payload_snrs, timestamp))
-        db.commit()
-    except Exception as err:
-        print(f"[DB] Error inserting trace_data: {err}")
+        conn_id = meta.get("connId")
+        timestamp = meta.get("timestamp")
 
+        payload_hashes = json.dumps(path_hashes)
+        payload_snrs = json.dumps(path_snrs)
 
-def _insert_diagnostic_overlay(overlay: dict) -> None:
-    raise NotImplementedError("insertDiagnosticOverlay not yet implemented")
+        sql = """
+            INSERT INTO trace_logs (
+              connId, nodeNum, tag, pathLen, lastSnr,
+              pathHashes, pathSnrs, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        try:
+            cursor = self.db.cursor()
+            cursor.execute(sql, (conn_id, None, tag, path_len, last_snr, payload_hashes, payload_snrs, timestamp))
+            self.db.commit()
+        except Exception as err:
+            print(f"[DB] Error inserting trace_data: {err}")
 
+    def insert_diagnostic_overlay(self, overlay: dict) -> None:
+        raise NotImplementedError("insertDiagnosticOverlay not yet implemented")
 
-def _insert_overlay_preview(preview: dict) -> None:
-    raise NotImplementedError("insertOverlayPreview not yet implemented")
+    def insert_overlay_preview(self, preview: dict) -> None:
+        raise NotImplementedError("insertOverlayPreview not yet implemented")
 
-
-def _insert_config_mutation(mutation: dict) -> None:
-    raise NotImplementedError("insertConfigMutation not yet implemented")
-
-
-# Exported object of insert functions
-diagnostic_inserts = {
-    "insertLogRecord": _insert_log_record,
-    "insertPacketLog": _insert_packet_log,
-    "injectPacketLog": _inject_packet_log,
-    "insertTraceData": _insert_trace_data,
-    "insertDiagnosticOverlay": _insert_diagnostic_overlay,
-    "insertOverlayPreview": _insert_overlay_preview,
-    "insertConfigMutation": _insert_config_mutation,
-}
+    def insert_config_mutation(self, mutation: dict) -> None:
+        raise NotImplementedError("insertConfigMutation not yet implemented")

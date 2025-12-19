@@ -1,18 +1,19 @@
 # src/server/startup_meshcore.py
 
 import os
+from urllib import request
 import uuid
 import asyncio
 import contextlib
+import logging
 
 from src.handlers.meshcore_handler import MeshcoreHandler
-from src.meshcore.meshcore_requests import bind_mesh_runtime as bind_meshcore_requests
 from asyncio import get_running_loop
 
 
-async def start_meshcore():
+async def start_meshcore(meshcore, request):
     # --- Config ---
-    print("===== STARTING UP MESHCORE =====")
+    logging.info("[MeshCore(tm)] ===== STARTING UP MESHCORE =====")
     host = os.getenv("MESHCORE_HOST", "192.168.2.79")
     port = int(os.getenv("MESHCORE_PORT", "5000"))
     mesh_params = {"connId": str(uuid.uuid4()), "host": host, "port": port}
@@ -20,18 +21,16 @@ async def start_meshcore():
         "getConfigOnConnect": False,  # we’ll handle init explicitly
         "reconnect": {"enabled": True},
     }
-    print(f"setting up Meshcore server host {host} port {port}")
+    logging.info(f"setting up Meshcore server host {host} port {port}")
 
     # --- Handler ---
-    meshcore = MeshcoreHandler(mesh_params, mesh_opts)
-    request = meshcore.tcp.request
+    meshcore.start_meshcore(mesh_params, mesh_opts)
 
     # Step 2: bind request helpers
-    bind_meshcore_requests(meshcore)
-
+    print (" staring up in meshcore ", request)
     # --- Startup sequence ---
     try:
-        await meshcore.connect(timeout_ms=20000)
+        await meshcore.connect(host, port, timeout_ms=20000)
         await request.get_self_info()
         print("[meshcore-1] Connection complete")
     except Exception as err:
@@ -53,7 +52,6 @@ async def start_meshcore():
     # Start advert loop
     request.start_loop("advert", lambda: request.send_flood_advert(), 3600000)
     await request.send_channel_text_message(1, "@[ackbot] this Brookline Node is Online")
-
     print("meshcore startup complete")
     return {
         "meshcore": meshcore,

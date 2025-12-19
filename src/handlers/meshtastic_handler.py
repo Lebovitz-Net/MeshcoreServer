@@ -1,18 +1,20 @@
 import asyncio
 from meshcore_py import EventEmitter
-from ..meshtastic.tcp_connection import TcpConnection
-from ..meshtastic.serial_connection import SerialConnection
+from connection.tcp_connection import TcpConnection
+from connection.serial_connection import SerialConnection
+from src.meshtastic.meshtastic_ingestion_handler import MeshtasticIngestionHandler
 
 
 class MeshtasticHandler(EventEmitter):
-    def __init__(self, conn_id: str, host: str, port: int, opts: dict = None):
+    def __init__(self, dispatcher, opts: dict = None):
         super().__init__()
         opts = opts or {}
-        reconnect = opts.get("reconnect", {"enabled": True})
-        get_config_on_connect = opts.get("getConfigOnConnect", False)
-
+        self.reconnect = opts.get("reconnect", {"enabled": True})
+        self.get_config_on_connect = opts.get("get_config_on_connect", False)
+        self.dispatcher = dispatcher
         # Single TCP connection
-        self.connection = TcpConnection(host, port, conn_id)
+        self.connection = TcpConnection()
+        self.ingestion_handler = MeshtasticIngestionHandler(dispatcher, self.on, self.off)
 
         # Serial connection
         self.serial_conn = SerialConnection("/dev/ttyUSB0", 115200, "serial-1")
@@ -50,7 +52,15 @@ class MeshtasticHandler(EventEmitter):
     def shutdown(self):
         """Gracefully shutdown TCP and Serial connections, then close handler."""
         print("[MeshtasticHandler] Shutting down...")
-
+        if self.ingestion_handler:
+            try:
+                self.ingestion_handler.detach()
+                print("[MeshtasticHandler] Ingestion handler detached.")
+            except Exception as e:
+                print(f"[MeshtasticHandler] Error detaching ingestion handler: {e}")
+            finally:
+                self.ingestion_handler = None
+                
         # TCP connection
         if self.connection:
             try:

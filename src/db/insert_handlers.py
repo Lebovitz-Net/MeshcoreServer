@@ -1,73 +1,54 @@
-# src/db/insertHandlers.py
+# src/db/insert_handlers.py
 
-from src.db.inserts.channel_inserts import channel_inserts
-from src.db.inserts.config_inserts import config_inserts
-from src.db.inserts.contact_inserts import contact_inserts
-from src.db.inserts.device_inserts import device_inserts
-from src.db.inserts.diagnostic_inserts import diagnostic_inserts
-from src.db.inserts.message_inserts import message_inserts
-from src.db.inserts.metric_inserts import metric_inserts
-from src.db.inserts.node_inserts import node_inserts
-
-
-# Merge all insert dicts into one registry
-allHandlers = {
-    **channel_inserts,
-    **config_inserts,
-    **contact_inserts,
-    **device_inserts,
-    **diagnostic_inserts,
-    **message_inserts,
-    **metric_inserts,
-    **node_inserts,
-}
+from src.db.inserts.message_inserts import MessageInserts
+from src.db.inserts.channel_inserts import ChannelInserts
+from src.db.inserts.config_inserts import ConfigInserts
+from src.db.inserts.contact_inserts import ContactInserts
+from src.db.inserts.device_inserts import DeviceInserts
+from src.db.inserts.diagnostic_inserts import DiagnosticInserts
+from src.db.inserts.metric_inserts import MetricInserts
+from src.db.inserts.node_inserts import NodeInserts
 
 
-class InsertHandlersClass:
-    """
-    Singleton class of all insert functions.
-    Dynamically attaches each insert function as an instance method.
-    """
+class InsertHandlers(
+    MessageInserts,
+    ChannelInserts,
+    ConfigInserts,
+    ContactInserts,
+    DeviceInserts,
+    DiagnosticInserts,
+    MetricInserts,
+    NodeInserts,
+):
+    __slots__ = ("db", "sse_emitter")
 
-    _instance = None
-
-    def __new__(cls, db=None):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
-
-    def __init__(self, db=None):
-        if self._initialized:
-            return
+    def __init__(self, db, sse_emitter, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.db = db
+        self.sse_emitter = sse_emitter
 
-        # Dynamically attach each insert function as an instance method
-        for name, func in allHandlers.items():
-            def make_method(f):
-                def method(self, *args, **kwargs):
-                    if self.db is not None:
-                        return f(self.db, *args, **kwargs)
-                    return f(*args, **kwargs)
-                return method
+    def __getitem__(self, name: str):
+        # Try exact match
+        fn = getattr(self, name, None)
 
-            setattr(self, name, make_method(func).__get__(self, InsertHandlersClass))
+        # Try camelCase → snake_case
+        if fn is None and any(c.isupper() for c in name):
+            snake = []
+            for c in name:
+                snake.append("_" + c.lower() if c.isupper() else c)
+            snake_name = "".join(snake)
+            fn = getattr(self, snake_name, None)
 
-        self._initialized = True
+        if fn is None:
+            raise KeyError(f"No insert handler named '{name}'")
 
-    def handle_insert(self, name: str, payload: dict, *args, **kwargs):
-        fn = allHandlers.get(name)
-        if not fn:
-            print(f"[InsertHandlers] Unknown insert function: {name}")
-            return None
-        try:
-            if self.db is not None:
-                return fn(self.db, payload, *args, **kwargs)
-            return fn(payload, *args, **kwargs)
-        except Exception as err:
-            print(f"[InsertHandlers] Error in {name}: {err}")
-            return None
+        return fn
 
+    def __contains__(self, name: str):
+        return hasattr(self, name)
 
-# Export the singleton instance under the name InsertHandlers
-InsertHandlers = InsertHandlersClass()
+    def __iter__(self):
+        for name in dir(self):
+            if name.startswith("insert_") or name.startswith("upsert_"):
+                yield name
+

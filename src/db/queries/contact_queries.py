@@ -1,14 +1,19 @@
-from src.db.database import db
+# src/db/queries/contact_queries.py
 
-def _list_contacts(limit: int = 500):
-    return db.execute("""
-        SELECT contactId, type, name, publicKey, timestamp, protocol,
-               nodeNum, shortName, times, options, position, connId
-        FROM users
-        ORDER BY timestamp DESC
-        LIMIT ?
-    """, (limit,)).fetchall()
+class ContactQueries:
+    """
+    Provides contact/user query handlers.
+    Expects `self.db` to be a valid database connection.
+    """
 
-contact_queries = {
-    "list_contacts": _list_contacts,
-}
+    def list_contacts(self, limit: int = 500):
+        return self.db.execute(
+            """
+            SELECT contactId, type, name, publicKey, timestamp, protocol,
+                   nodeNum, shortName, times, options, position, connId
+            FROM users
+            ORDER BY timestamp DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()

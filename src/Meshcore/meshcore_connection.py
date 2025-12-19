@@ -2,34 +2,35 @@ import asyncio
 import socket
 import time
 import traceback
+import logging
 
-from external.meshcore_py.src.packets import Packet
-from external.meshcore_py.src.buffer.buffer_reader import BufferReader
-from external.meshcore_py.src.connection.tcp_connection import TCPConnection
-from external.meshcore_py.src.constants import Constants
-from .packets.port_nums import port_nums, get_name
-from .meshcore_requests import MeshcoreRequests
+import meshcore_py
+from meshcore_py.packets import Packet
+from meshcore_py.buffer.buffer_reader import BufferReader
+from meshcore_py.connection.tcp_connection import TCPConnection
+from meshcore_py.constants import Constants
+from .port_nums import port_nums, get_name
 from asyncio import get_running_loop
 
 
 class MeshcoreConnection(TCPConnection):
-    def __init__(self, host: str, port: int, handler):
-        super().__init__(host, port)
+    def __init__(self):
+        super().__init__()
         self.read_buffer = bytearray()
         self._reconnect_in_progress = False
         self._reconnect_attempts = 0
 
         # Request API wrapper
-        self.request = MeshcoreRequests(
-            {"connection": self, "on": handler.on}, timeout_ms=10000
-        )
+        # self.request = MeshcoreRequests(
+        #     {"connection": self, "on": handler.on}, timeout_ms=10000
+        # )
 
     def attempt_reconnect(self):
         if self._reconnect_in_progress:
             return
         self._reconnect_in_progress = True
 
-        print(f"[{time.strftime('%Y-%m-%dT%H:%M:%S')}] Attempting reconnect")
+        logging.info(f"[{time.strftime('%Y-%m-%dT%H:%M:%S')}] Attempting reconnect")
 
         try:
             if self.socket:
@@ -48,11 +49,13 @@ class MeshcoreConnection(TCPConnection):
 
     def _reset_and_connect(self):
         self._reconnect_in_progress = False
-        asyncio.create_task(self.connect())
+        asyncio.create_task(self.connect(self.host, self.port))
 
-    async def connect(self):
+    async def connect(self, host: str = None, port: int = None):
+        self.host = host or self.host
+        self.port = port or self.port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print("in connection")
+        logging.info(f"[MeshcoreConnection] Connecting to {self.host}:{self.port}")
         try:
             await get_running_loop().sock_connect(self.socket, (self.host, self.port))
             # loop must go before on_connected because part of the connect is receiving
@@ -64,7 +67,7 @@ class MeshcoreConnection(TCPConnection):
 
             self._reconnect_in_progress = False
         except Exception as e:
-            print("Connection Error", e)
+            logging.error("[MeshcoreConnection] Connection Error %s", e)
             traceback.print_exc()
             self.attempt_reconnect()
             return
@@ -77,7 +80,7 @@ class MeshcoreConnection(TCPConnection):
                     break
                 self.on_socket_data_received(data)
         except Exception as e:
-            print("Socket read error:", e)
+            logging.error("[MescoreConnection] Socket read error %s", e)
             self.attempt_reconnect()
         finally:
             if self.socket != None:
@@ -98,8 +101,8 @@ class MeshcoreConnection(TCPConnection):
                 required_length = frame_header_length + frame_length
 
                 if frame_type not in (
-                    Constants.SerialFrameTypes.Incoming,
-                    Constants.SerialFrameTypes.Outgoing,
+                    Constants.SerialFrameTypes.INCOMING,
+                    Constants.SerialFrameTypes.OUTGOING,
                 ):
                     self.read_buffer = self.read_buffer[1:]
                     continue
@@ -119,8 +122,8 @@ class MeshcoreConnection(TCPConnection):
     def route_frame(self, frame_data: bytes):
         frame_type = frame_data[0]
         is_structured = frame_type in (
-            Constants.SerialFrameTypes.Incoming,
-            Constants.SerialFrameTypes.Outgoing,
+            Constants.SerialFrameTypes.INCOMING,
+            Constants.SerialFrameTypes.OUTGOING,
         )
 
         if not is_structured:
@@ -191,12 +194,12 @@ class MeshcoreConnection(TCPConnection):
                 self.socket = None
 
         # Shutdown request API (cascades into MeshcoreCommandQueue)
-        if self.request:
-            try:
-                self.request.shutdown()
-            except Exception as e:
-                print(f"[MeshcoreConnection] Error shutting down requests: {e}")
-            finally:
-                self.request = None
+        # if self.request:
+        #     try:
+        #         self.request.shutdown()
+        #     except Exception as e:
+        #         print(f"[MeshcoreConnection] Error shutting down requests: {e}")
+        #     finally:
+        #         self.request = None
 
         print("[MeshcoreConnection] Shutdown complete.")
