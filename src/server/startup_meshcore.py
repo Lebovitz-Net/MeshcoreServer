@@ -57,7 +57,7 @@ async def start_meshcore(meshcore, request):
 
     # Start advert loop
     request.start_loop("advert", lambda: request.send_flood_advert(), 3600000)
-    await request.send_channel_text_message(1, "@[ackbot] this Brookline Node is Online")
+    # await request.send_channel_text_message(1, "@[ackbot] this Brookline Node is Online")
     print("meshcore startup complete")
     return {
         "meshcore": meshcore,
