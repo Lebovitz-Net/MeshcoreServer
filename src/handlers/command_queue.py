@@ -5,6 +5,7 @@ import time
 import inspect
 from typing import Callable, Dict, Optional, Any
 from asyncio import get_running_loop
+import traceback
 
 
 class CommandQueue:
@@ -63,6 +64,7 @@ class CommandQueue:
             except Exception as err:
                 timer.cancel()
                 print(f"[CommandQueue] Command dispatch error: {err!r}")
+                traceback.print_exc()
                 if self.waiting:
                     self.waiting("error")
 

@@ -26,10 +26,22 @@ class MessagesAPI:
         channel_id = body.get("channelId")
         sender = body.get("sender")
 
+        def to_millis(ts):
+            if ts is None:
+                return None
+            # if seconds (10 digits-ish), convert to ms
+            if ts < 1_000_000_000_000:
+                return ts * 1000
+            return ts
+
+
         if not message or not isinstance(message, str):
             return web.json_response({"error": "Missing or invalid payload"}, status=400)
 
         await self.requests.send_channel_text_message(channel_id, message)
+
+        recv_ts = body.get("recvTimestamp")
+        sent_ts = body.get("sentTimestamp")
 
         shaped = {
             "contactId": sender,
@@ -38,13 +50,14 @@ class MessagesAPI:
             "fromNodeNum": body.get("fromNodeNum"),
             "toNodeNum": body.get("toNodeNum"),
             "message": f"{sender}: {message}",
-            "recvTimestamp": body.get("recvTimestamp"),
-            "sentTimestamp": body.get("sentTimestamp"),
+            "recvTimestamp": to_millis(recv_ts),
+            "sentTimestamp": to_millis(sent_ts),
             "protocol": body.get("protocol"),
             "sender": sender,
             "mentions": body.get("mentions"),
             "options": body.get("options"),
         }
+
 
         inserted = self.insert.insert_message(shaped)
         return web.json_response({"ok": True, "message": safe_json(inserted)})

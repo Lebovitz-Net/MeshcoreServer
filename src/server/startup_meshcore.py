@@ -14,8 +14,14 @@ from asyncio import get_running_loop
 async def start_meshcore(meshcore, request):
     # --- Config ---
     logging.info("[MeshCore(tm)] ===== STARTING UP MESHCORE =====")
+
     host = os.getenv("MESHCORE_HOST", "192.168.2.79")
     port = int(os.getenv("MESHCORE_PORT", "5000"))
+    frequency = int(os.getenv("MESHCORE_FREQUENCY", "910525000"))
+    bandwidth = int(os.getenv("MESHCORE_BANDWIDTH", "62500"))
+    sf = int(os.getenv("MESHCORE_SF", "7"))
+    cr = int(os.getenv("MESHCORE_CR", "5"))
+
     mesh_params = {"connId": str(uuid.uuid4()), "host": host, "port": port}
     mesh_opts = {
         "getConfigOnConnect": False,  # we’ll handle init explicitly
@@ -37,7 +43,7 @@ async def start_meshcore(meshcore, request):
         print("[meshcore-1] Connection failed:", err)
 
     # Configure radio + advert
-    await request.set_radio_params(910525, 62500, 7, 5)
+    await request.set_radio_params(frequency/1000, bandwidth, sf, cr)
     await request.set_tx_power(22)
     await request.set_advert_name("KD1MU")
     await request.set_advert_lat_long(42345096, -71121411)

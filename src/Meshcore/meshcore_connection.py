@@ -68,7 +68,6 @@ class MeshcoreConnection(TCPConnection):
             self._reconnect_in_progress = False
         except Exception as e:
             logging.error("[MeshcoreConnection] Connection Error %s", e)
-            traceback.print_exc()
             self.attempt_reconnect()
             return
 

@@ -27,7 +27,10 @@ class MessageInserts:
               :sentTimestamp, :protocol, :sender, :mentions, :options
             )
         """
-
+        self.sse_emitter.emit("message_arrived", {
+            **msg,
+            "timestamp": msg.get("timestamp", int(time.time() * 1000)),
+        })
         try:
             cursor = self.db.cursor()
             cursor.execute(
@@ -42,7 +45,4 @@ class MessageInserts:
         except Exception as err:
             print(f"[DB] Error inserting message: {err}")
             return
-        self.sse_emitter.emit("message_arrived", {
-            **msg,
-            "timestamp": msg.get("timestamp", int(time.time() * 1000)),
-        })
+
